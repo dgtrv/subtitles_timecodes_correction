@@ -18,10 +18,6 @@ SAMPLE_EVENT_TIMECODE_TARGET = ""
 EVENT_PREFIX = "Dialogue: "
 
 
-def shift(dialogue_events: List[str]) -> None:
-    pass
-
-
 def timecode_to_milliseconds(timecode: str) -> int:
     """Convert timecode to time in milliseconds.
 
@@ -46,19 +42,8 @@ def milliseconds_to_timecode(milliseconds: int) -> str:
     minutes = int((milliseconds % 3600000) / 60000)
     seconds = int((milliseconds % 60000) / 1000)
     santiseconds = int((milliseconds % 1000) / 10)
-    timecode = f"{hours}:{minutes:02}:{seconds:02}.{santiseconds}"
+    timecode = f"{hours}:{minutes:02}:{seconds:02}.{santiseconds:02}"
     return timecode
-
-
-source_event_milliseconds = timecode_to_milliseconds(
-    SAMPLE_EVENT_TIMECODE_SOURCE
-)
-target_event_milliseconds = timecode_to_milliseconds(
-    SAMPLE_EVENT_TIMECODE_TARGET
-)
-speed_delta = (
-    target_event_milliseconds - source_event_milliseconds
-) / source_event_milliseconds
 
 
 def get_start_and_end_timecodes_positions(line: str) -> Tuple[int, int]:
@@ -78,10 +63,30 @@ def get_start_and_end_timecodes_positions(line: str) -> Tuple[int, int]:
     return start_timecode_position, end_timecode_position
 
 
-if __name__ == "__main__":
+def get_video_playback_speed_delta(
+    source_sample_timecode: str, target_sample_timecode: str
+) -> float:
+    source_event_milliseconds = timecode_to_milliseconds(
+        source_sample_timecode
+    )
+    target_event_milliseconds = timecode_to_milliseconds(
+        target_sample_timecode
+    )
+    speed_delta = (
+        target_event_milliseconds - source_event_milliseconds
+    ) / source_event_milliseconds
 
-    with open(INPUT_FILENAME, "r") as input_file, open(
-        OUPUT_FILENAME, "w"
+    return speed_delta
+
+
+def process_subtitles_file(
+    path_to_input_file,
+    path_to_output_file,
+    event_prefix,
+    speed_delta,
+):
+    with open(path_to_input_file, "r") as input_file, open(
+        path_to_output_file, "w"
     ) as output_file:
         is_previous_line_events_header = False
         start_timecode_position = None
@@ -98,10 +103,10 @@ if __name__ == "__main__":
                     ) = get_start_and_end_timecodes_positions(line)
                     is_previous_line_events_header = False
 
-            if line.startswith(EVENT_PREFIX):
+            if line.startswith(event_prefix):
                 if is_previous_line_events_header:
                     raise Exception(
-                        f"Found prefix {EVENT_PREFIX} before corresponding format line."
+                        f"Found prefix {event_prefix} before corresponding format line."
                         "Seems like subtitles file is corrupted. Cannot continue."
                     )
 
@@ -144,3 +149,17 @@ if __name__ == "__main__":
                 continue
 
             output_file.write(line)
+
+
+if __name__ == "__main__":
+
+    video_playback_speed_delta = get_video_playback_speed_delta(
+        SAMPLE_EVENT_TIMECODE_SOURCE, SAMPLE_EVENT_TIMECODE_TARGET
+    )
+
+    process_subtitles_file(
+        path_to_input_file=INPUT_FILENAME,
+        path_to_output_file=OUPUT_FILENAME,
+        event_prefix=EVENT_PREFIX,
+        speed_delta=video_playback_speed_delta,
+    )
