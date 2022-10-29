@@ -1,5 +1,10 @@
 """
-Simple module for auto shifting subtitles in ass files.
+Simple module for adapting subtitles timecodes to different video speed.
+
+Works with .ass files. All the strings with prefix EVENT_PREFIX will be 
+processed: start and end timecode will be shifted according to supplied 
+sample timecode from initial file and corresponding target timecode for 
+file with different video playback speed.
 """
 
 from typing import List
@@ -7,8 +12,8 @@ from typing import List
 INPUT_FILENAME = ""
 OUPUT_FILENAME = ""
 
-LAST_EVENT_TIMECODE = ""
-LAST_EVENT_TIMECODE_REAL = ""
+SAMPLE_EVENT_TIMECODE_SOURCE = ""
+SAMPLE_EVENT_TIMECODE_TARGET = ""
 
 EVENT_PREFIX = "Dialogue: "
 
@@ -35,11 +40,15 @@ def milliseconds_to_timecode(milliseconds: int) -> str:
     return timecode
 
 
-last_event_milliseconds = timecode_to_milliseconds(LAST_EVENT_TIMECODE)
-real_event_milliseconds = timecode_to_milliseconds(LAST_EVENT_TIMECODE_REAL)
+source_event_milliseconds = timecode_to_milliseconds(
+    SAMPLE_EVENT_TIMECODE_SOURCE
+)
+target_event_milliseconds = timecode_to_milliseconds(
+    SAMPLE_EVENT_TIMECODE_TARGET
+)
 speed_delta = (
-    real_event_milliseconds - last_event_milliseconds
-) / last_event_milliseconds
+    target_event_milliseconds - source_event_milliseconds
+) / source_event_milliseconds
 
 
 if __name__ == "__main__":
