@@ -7,7 +7,7 @@ sample timecode from initial file and corresponding target timecode for
 file with different video playback speed.
 """
 
-from typing import List
+from typing import List, Tuple
 
 INPUT_FILENAME = ""
 OUPUT_FILENAME = ""
@@ -23,6 +23,11 @@ def shift(dialogue_events: List[str]) -> None:
 
 
 def timecode_to_milliseconds(timecode: str) -> int:
+    """Convert timecode to time in milliseconds.
+
+    Timecode format should be: h:mm:ss.centiseconds.
+    One santisecond equals to 0.01 s.
+    """
     hours, minutes, seconds_with_santiseconds = timecode.split(":")
     seconds, santiseconds = seconds_with_santiseconds.split(".")
     milliseconds = (
@@ -32,6 +37,11 @@ def timecode_to_milliseconds(timecode: str) -> int:
 
 
 def milliseconds_to_timecode(milliseconds: int) -> str:
+    """Convert time in milliseconds to timecode.
+
+    Timecode format: h:mm:ss.centiseconds.
+    One santisecond equals to 0.01 s.
+    """
     hours = int(milliseconds / 3600000)
     minutes = int((milliseconds % 3600000) / 60000)
     seconds = int((milliseconds % 60000) / 1000)
@@ -51,18 +61,60 @@ speed_delta = (
 ) / source_event_milliseconds
 
 
+def get_start_and_end_timecodes_positions(line: str) -> Tuple[int, int]:
+    """Get position of start and end timecode from event format line."""
+    start_timecode_position = None
+    end_timecode_position = None
+    _, format_headers = line.split(":", maxsplit=1)
+    for position, header in enumerate(format_headers.strip().split(",")):
+        if header.strip() == "Start":
+            start_timecode_position = position
+        if header.strip() == "End":
+            end_timecode_position = position
+    if not start_timecode_position:
+        raise ValueError('No entry named "Start" in events headers')
+    if not end_timecode_position:
+        raise ValueError('No entry named "End" in events headers')
+    return start_timecode_position, end_timecode_position
+
+
 if __name__ == "__main__":
 
     with open(INPUT_FILENAME, "r") as input_file, open(
         OUPUT_FILENAME, "w"
     ) as output_file:
+        is_previous_line_events_header = False
+        start_timecode_position = None
+        end_timecode_position = None
         for line in input_file.readlines():
+            if line.strip() == "[Events]":
+                is_previous_line_events_header = True
+
+            if is_previous_line_events_header:
+                if line.startswith("Format:"):
+                    (
+                        start_timecode_position,
+                        end_timecode_position,
+                    ) = get_start_and_end_timecodes_positions(line)
+                    is_previous_line_events_header = False
+
             if line.startswith(EVENT_PREFIX):
+                if is_previous_line_events_header:
+                    raise Exception(
+                        f"Found prefix {EVENT_PREFIX} before corresponding format line."
+                        "Seems like subtitles file is corrupted. Cannot continue."
+                    )
+
+                if not start_timecode_position or not end_timecode_position:
+                    raise Exception(
+                        "To process timecodes both start and end timecodes positions"
+                        "should be known. Something is wrong with events header or with format line"
+                    )
+
                 dialog_event = line[len(EVENT_PREFIX) :]
-                dialog_elements: List[str] = dialog_event.split(
-                    ",", maxsplit=3
-                )
-                _, start_timecode, end_timecode, _ = dialog_elements
+                dialog_elements: List[str] = dialog_event.split(",")
+                start_timecode = dialog_elements[start_timecode_position]
+                end_timecode = dialog_elements[end_timecode_position]
 
                 start_milliseconds = timecode_to_milliseconds(start_timecode)
                 end_milliseconds = timecode_to_milliseconds(end_timecode)
