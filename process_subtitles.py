@@ -1,19 +1,14 @@
 """
 Simple module for adapting subtitles timecodes to different video speed.
 
-Works with .ass files. All the strings with prefix EVENT_PREFIX will be 
-processed: start and end timecode will be shifted according to supplied 
-sample timecode from initial file and corresponding target timecode for 
+Works with .ass files. All the strings with prefix EVENT_PREFIX will be
+processed: start and end timecode will be shifted according to supplied
+sample timecode from initial file and corresponding target timecode for
 file with different video playback speed.
 """
 
+from sys import argv
 from typing import List, Tuple
-
-INPUT_FILENAME = ""
-OUPUT_FILENAME = ""
-
-SAMPLE_EVENT_TIMECODE_SOURCE = ""
-SAMPLE_EVENT_TIMECODE_TARGET = ""
 
 EVENT_PREFIX = "Dialogue: "
 
@@ -153,13 +148,56 @@ def process_subtitles_file(
 
 if __name__ == "__main__":
 
+    if len(argv) < 5:
+        raise Exception(
+            "You have to provide all the parameters:"
+            "input file, output file, source sample timecode, target sample timecode."
+        )
+
+    path_to_input_file = None
+    path_to_output_file = None
+    source_sample_timecode = None
+    target_sample_timecode = None
+
+    for argument in argv[1:]:
+        argument_name, argument_value = argument.split("=")
+        if argument_name in ["-i", "--input"]:
+            path_to_input_file = argument_value.strip()
+            continue
+
+        if argument_name in ["-o", "--output"]:
+            path_to_output_file = argument_value
+            continue
+
+        if argument_name in ["-s", "--tc_source"]:
+            source_sample_timecode = argument_value
+            continue
+
+        if argument_name in ["-t", "--tc_target"]:
+            target_sample_timecode = argument_value
+            continue
+
+        raise Exception(f"Unknown argument {argument_name}")
+
+    if not path_to_input_file:
+        raise Exception("Input file path must be provided")
+
+    if not path_to_output_file:
+        raise Exception("Output file path must be provided")
+
+    if not source_sample_timecode:
+        raise Exception("Source sample timecode must be provided")
+
+    if not target_sample_timecode:
+        raise Exception("Target sample timecode must be provided")
+
     video_playback_speed_delta = get_video_playback_speed_delta(
-        SAMPLE_EVENT_TIMECODE_SOURCE, SAMPLE_EVENT_TIMECODE_TARGET
+        source_sample_timecode, target_sample_timecode
     )
 
     process_subtitles_file(
-        path_to_input_file=INPUT_FILENAME,
-        path_to_output_file=OUPUT_FILENAME,
+        path_to_input_file=path_to_input_file,
+        path_to_output_file=path_to_output_file,
         event_prefix=EVENT_PREFIX,
         speed_delta=video_playback_speed_delta,
     )
