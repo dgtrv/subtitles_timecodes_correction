@@ -7,7 +7,8 @@ sample timecode from initial file and corresponding target timecode for
 file with different video playback speed.
 """
 
-from sys import argv
+from os import path
+from sys import argv, exit
 from typing import List, Tuple
 
 EVENT_PREFIX = "Dialogue: "
@@ -74,6 +75,38 @@ def get_video_playback_speed_delta(
     return speed_delta
 
 
+def process_event_string(
+    line: str,
+    event_prefix: str,
+    start_timecode_position: int,
+    end_timecode_position: int,
+    speed_delta: float,
+) -> str:
+    dialog_event = line[len(event_prefix) :]
+    dialog_elements: List[str] = dialog_event.split(",")
+    start_timecode = dialog_elements[start_timecode_position]
+    end_timecode = dialog_elements[end_timecode_position]
+
+    start_milliseconds = timecode_to_milliseconds(start_timecode)
+    end_milliseconds = timecode_to_milliseconds(end_timecode)
+    start_milliseconds_corrected = int(start_milliseconds * (1 + speed_delta))
+    end_milliseconds_corrected = int(end_milliseconds * (1 + speed_delta))
+
+    start_timecode_corrected = milliseconds_to_timecode(
+        start_milliseconds_corrected
+    )
+    end_timecode_corrected = milliseconds_to_timecode(
+        end_milliseconds_corrected
+    )
+
+    dialog_elements[1] = start_timecode_corrected
+    dialog_elements[2] = end_timecode_corrected
+
+    dialog_event_corrected = f"{event_prefix}{','.join(dialog_elements)}"
+
+    return dialog_event_corrected
+
+
 def process_subtitles_file(
     path_to_input_file,
     path_to_output_file,
@@ -111,35 +144,15 @@ def process_subtitles_file(
                         "should be known. Something is wrong with events header or with format line"
                     )
 
-                dialog_event = line[len(EVENT_PREFIX) :]
-                dialog_elements: List[str] = dialog_event.split(",")
-                start_timecode = dialog_elements[start_timecode_position]
-                end_timecode = dialog_elements[end_timecode_position]
-
-                start_milliseconds = timecode_to_milliseconds(start_timecode)
-                end_milliseconds = timecode_to_milliseconds(end_timecode)
-                start_milliseconds_corrected = int(
-                    start_milliseconds * (1 + speed_delta)
-                )
-                end_milliseconds_corrected = int(
-                    end_milliseconds * (1 + speed_delta)
+                output_line = process_event_string(
+                    line=line,
+                    event_prefix=event_prefix,
+                    start_timecode_position=start_timecode_position,
+                    end_timecode_position=end_timecode_position,
+                    speed_delta=speed_delta,
                 )
 
-                start_timecode_corrected = milliseconds_to_timecode(
-                    start_milliseconds_corrected
-                )
-                end_timecode_corrected = milliseconds_to_timecode(
-                    end_milliseconds_corrected
-                )
-
-                dialog_elements[1] = start_timecode_corrected
-                dialog_elements[2] = end_timecode_corrected
-
-                dialog_event_corrected = (
-                    f"{EVENT_PREFIX}{','.join(dialog_elements)}"
-                )
-
-                output_file.write(dialog_event_corrected)
+                output_file.write(output_line)
 
                 continue
 
@@ -190,6 +203,18 @@ if __name__ == "__main__":
 
     if not target_sample_timecode:
         raise Exception("Target sample timecode must be provided")
+
+    if path.exists(path_to_output_file):
+        while True:
+            user_answer = input(
+                f"File {path_to_output_file} already exists. Overwrite (Y[es]/N[o])?"
+            )
+            if user_answer.lower() in ["y", "yes"]:
+                break
+            if user_answer.lower() in ["n", "no"]:
+                print("Ok. Haven't touch anything.")
+                exit(0)
+            print('Print "Yes" or "No"\n')
 
     video_playback_speed_delta = get_video_playback_speed_delta(
         source_sample_timecode, target_sample_timecode
